@@ -34,4 +34,5 @@ public class JdbcMealRepositoryImpl implements MealRepository {
     public List<Meal> getBetween(LocalDateTime startDate, LocalDateTime endDate, int userId) {
         return null;
     }
+
 }

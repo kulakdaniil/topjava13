@@ -1,83 +1,62 @@
 package ru.javawebinar.topjava.web.meal;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-import ru.javawebinar.topjava.AuthorizedUser;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import ru.javawebinar.topjava.model.Meal;
-import ru.javawebinar.topjava.service.MealService;
 import ru.javawebinar.topjava.to.MealWithExceed;
-import ru.javawebinar.topjava.util.DateTimeUtil;
-import ru.javawebinar.topjava.util.MealsUtil;
+ 
 
-import java.text.MessageFormat;
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.net.URI;
+import java.time.LocalDateTime;
 import java.util.List;
+        
+@RestController
+@RequestMapping(value = MealRestController.REST_URL, produces = MediaType.APPLICATION_JSON_VALUE)
+public class MealRestController extends AbstractMealController {
+    static final String REST_URL = "/rest/profile/meals";
 
-import static ru.javawebinar.topjava.util.Util.orElse;
-import static ru.javawebinar.topjava.util.ValidationUtil.assureIdConsistent;
-import static ru.javawebinar.topjava.util.ValidationUtil.checkNew;
-
-@Controller
-public class MealRestController {
-    private static final Logger log = LoggerFactory.getLogger(MealRestController.class);
-
-    private final MealService service;
-
-    @Autowired
-    public MealRestController(MealService service) {
-        this.service = service;
+    @Override
+    @GetMapping("/{id}")
+    public Meal get(@PathVariable("id") int id) {
+                return super.get(id);
     }
 
-    public Meal get(int id) {
-        int userId = AuthorizedUser.id();
-        log.info("get meal {} for user {}", id, userId);
-        return service.get(id, userId);
+    @Override
+    @DeleteMapping("/{id}")
+    @ResponseStatus(value = HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable("id") int id) {
+        super.delete(id);
     }
 
-    public void delete(int id) {
-        int userId = AuthorizedUser.id();
-        log.info("delete meal {} for user {}", id, userId);
-        service.delete(id, userId);
-    }
-
+    @Override
+    @GetMapping
     public List<MealWithExceed> getAll() {
-        int userId = AuthorizedUser.id();
-        log.info("getAll for user {}", userId);
-        return MealsUtil.getWithExceeded(service.getAll(userId), AuthorizedUser.getCaloriesPerDay());
+        return super.getAll();
     }
 
-    public Meal create(Meal meal) {
-        int userId = AuthorizedUser.id();
-        checkNew(meal);
-        log.info("create {} for user {}", meal, userId);
-        return service.create(meal, userId);
+    @Override
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public void update(@RequestBody Meal meal, @PathVariable("id") int id) {
+        super.update(meal, id);
     }
 
-    public void update(Meal meal, int id) {
-        int userId = AuthorizedUser.id();
-        assureIdConsistent(meal, id);
-        log.info("update {} for user {}", meal, userId);
-        service.update(meal, userId);
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Meal> createWithLocation(@RequestBody Meal meal) {
+        Meal created = super.create(meal);
+        URI uriOfNewResource = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path(REST_URL + "/{id}")
+                .buildAndExpand(created.getId()).toUri();
+        return ResponseEntity.created(uriOfNewResource).body(created);
     }
 
-    /**
-     * <ol>Filter separately
-     * <li>by date</li>
-     * <li>by time for every date</li>
-     * </ol>
-     */
-    public List<MealWithExceed> getBetween(LocalDate startDate, LocalTime startTime, LocalDate endDate, LocalTime endTime) {
-        int userId = AuthorizedUser.id();
-        log.info("getBetween dates({} - {}) time({} - {}) for user {}", startDate, endDate, startTime, endTime, userId);
-
-        List<Meal> mealsDateFiltered = service.getBetweenDates(
-                orElse(startDate, DateTimeUtil.MIN_DATE), orElse(endDate, DateTimeUtil.MAX_DATE), userId);
-
-        return MealsUtil.getFilteredWithExceeded(mealsDateFiltered, AuthorizedUser.getCaloriesPerDay(),
-                orElse(startTime, LocalTime.MIN), orElse(endTime, LocalTime.MAX)
-        );
+    @GetMapping(value = "/between")
+    public List<MealWithExceed> getBetween(
+    @RequestParam(value = "startDateTime") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDateTime,
+    @RequestParam(value = "endDateTime") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDateTime) {
+        return super.getBetween(startDateTime.toLocalDate(), startDateTime.toLocalTime(), endDateTime.toLocalDate(), endDateTime.toLocalTime());
     }
 }
